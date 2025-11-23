@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mitochondrial Transport: Pathways</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="script.js" defer></script>
+</head>
+
+<body>
+
+    <div class="main-layout">
+        <div class="simulation-view">
+            <canvas id="simCanvas"></canvas>
+            <div id="overlay" class="msg-overlay">
+                <div id="msgTitle" class="msg-title"></div>
+                <div id="msgBody" class="msg-body"></div>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <h1>Mito Pathways</h1>
+
+            <div class="score-box">
+                Correct: <span id="scoreVal">0</span> | Case: <span id="caseNum">1</span>
+            </div>
+
+            <div class="protein-card">
+                <h2 id="pName">Identifying...</h2>
+                <span id="pDest" class="dest">Target: ...</span>
+                <p id="pDesc">...</p>
+            </div>
+
+            <div class="btn-grid">
+                <p style="margin:0 0 5px 0; font-weight:bold; font-size:0.9rem;">Select Pathway:</p>
+                <button class="btn" onclick="selectPath('tom_tim23')">
+                    A. TOM &rarr; TIM23
+                </button>
+                <button class="btn" onclick="selectPath('tom_tim22')">
+                    B. TOM &rarr; TIM22
+                </button>
+                <button class="btn" onclick="selectPath('tom_small_tims')">
+                    C. TOM &rarr; Small TIMs
+                </button>
+                <button class="btn" onclick="selectPath('tom_sam')">
+                    D. TOM &rarr; SAM
+                </button>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>
