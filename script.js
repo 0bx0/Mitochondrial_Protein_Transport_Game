@@ -1,3 +1,4 @@
+// Comment because for some reason the page is a few commits behind?
 const canvas = document.getElementById('simCanvas');
 const ctx = canvas.getContext('2d');
 
