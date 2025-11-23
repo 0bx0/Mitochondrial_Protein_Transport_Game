@@ -298,7 +298,7 @@ function update() {
             evaluateResult();
         }
     }
-
+    //commit thing
     // Trail
     state.pathPoints.unshift({ x: state.pos.x, y: state.pos.y });
     if (state.pathPoints.length > 25) state.pathPoints.pop();
