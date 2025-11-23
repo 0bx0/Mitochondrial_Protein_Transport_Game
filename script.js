@@ -38,10 +38,10 @@ const ZONES = {
 };
 
 const COMPLEXES = {
-    tom: { x: 0.5, yZone: 'om', color: '#c0392b', label: 'TOM' },
-    sam: { x: 0.85, yZone: 'om', color: '#8e44ad', label: 'SAM' },
-    tim23: { x: 0.5, yZone: 'im', color: '#d35400', label: 'TIM23' },
-    tim22: { x: 0.2, yZone: 'im', color: '#27ae60', label: 'TIM22' }
+    tom: { x: 0.5, yZone: 'om', color: '#3498db', label: 'TOM' }, // Blue
+    sam: { x: 0.85, yZone: 'om', color: '#3498db', label: 'SAM' }, // Blue
+    tim23: { x: 0.5, yZone: 'im', color: '#2ecc71', label: 'TIM23' }, // Green
+    tim22: { x: 0.2, yZone: 'im', color: '#2ecc71', label: 'TIM22' }  // Green
 };
 
 const PROTEIN_TYPES = [
@@ -50,7 +50,7 @@ const PROTEIN_TYPES = [
         name: 'Matrix Enzyme',
         dest: 'Target: Matrix',
         desc: 'Has N-terminal presequence. Needs to cross both membranes to reach the core.',
-        color: '#e74c3c',
+        color: '#e74c3c', // Red
         signalColor: '#f1c40f'
     },
     {
@@ -58,7 +58,7 @@ const PROTEIN_TYPES = [
         name: 'Carrier Protein',
         dest: 'Target: Inner Membrane',
         desc: 'Multipass hydrophobic protein. Needs to be inserted into the Inner Membrane.',
-        color: '#2ecc71',
+        color: '#e74c3c', // Red
         signalColor: '#2ecc71'
     },
     {
@@ -66,7 +66,7 @@ const PROTEIN_TYPES = [
         name: 'IMS Chaperone',
         dest: 'Target: Intermembrane Space',
         desc: 'Cysteine-rich protein. Needs to be kept in the space between membranes.',
-        color: '#f39c12',
+        color: '#e74c3c', // Red
         signalColor: '#f39c12'
     },
     {
@@ -74,7 +74,7 @@ const PROTEIN_TYPES = [
         name: 'Beta-Barrel Porin',
         dest: 'Target: Outer Membrane',
         desc: 'Beta-sheet structure. Needs to insert into the Outer Membrane.',
-        color: '#9b59b6',
+        color: '#e74c3c', // Red
         signalColor: '#9b59b6'
     }
 ];
@@ -200,52 +200,103 @@ function update() {
         if (state.pos.y > tim23Y + 150) evaluateResult();
     }
 
-    // B. Inner Membrane (TIM22)
+    // B. Inner Membrane (TIM22) - Multipass Weaving
     else if (state.phase === 'moving_tim22') {
         // Move laterally in IMS with chaperones
         const tX = canvas.width * COMPLEXES.tim22.x;
         moveTo(tX, tim23Y - 20, speed, () => {
             state.phase = 'entering_tim22';
+            state.timer = 0; // Reset timer for weaving
         });
     }
     else if (state.phase === 'entering_tim22') {
-        state.pos.y += 1; // Insert slow
+        state.timer++;
+
         // Fade out chaperones
         if (state.smallTims.length > 0 && Math.random() > 0.8) state.smallTims.pop();
 
-        if (state.pos.y >= tim23Y + 10) evaluateResult();
-    }
+        // Multipass Weaving Animation
+        // Weave up and down across the membrane line
+        const membraneY = tim23Y;
+        const weaveSpeed = 0.1;
+        const weaveAmp = 15;
 
-    // C. IMS Trap (Small TIMs)
-    else if (state.phase === 'ims_trap') {
-        state.timer++;
-        // Float around in IMS
-        state.pos.y += (Math.random() - 0.5);
+        // Horizontal drift
         state.pos.x += (Math.random() - 0.5);
 
-        // Use timer for duration (approx 2 seconds @ 60fps) instead of unreachable pathPoints length
-        if (state.timer > 120) {
+        // Vertical Weave
+        // Use sin wave to simulate passing in and out
+        state.pos.y = membraneY + Math.sin(state.timer * weaveSpeed) * weaveAmp;
+
+        // Damping amplitude over time to "stuck" it
+        if (state.timer > 100) {
+            // Settle into membrane
+            const targetY = membraneY;
+            state.pos.y += (targetY - state.pos.y) * 0.05;
+
+            if (Math.abs(state.pos.y - targetY) < 1 && state.timer > 150) {
+                evaluateResult();
+            }
+        }
+    }
+
+    // C. IMS Trap (Small TIMs) - Bouncing Physics
+    else if (state.phase === 'ims_trap') {
+        state.timer++;
+
+        // Define IMS boundaries
+        const imsTop = (ZONES.ims.y * canvas.height);
+        const imsBottom = imsTop + (ZONES.ims.h * canvas.height);
+
+        // Random velocity changes (Brownian-ish)
+        if (!state.vel) state.vel = { x: (Math.random() - 0.5) * 2, y: (Math.random() - 0.5) * 2 };
+
+        state.vel.x += (Math.random() - 0.5) * 0.2;
+        state.vel.y += (Math.random() - 0.5) * 0.2;
+
+        // Dampen velocity
+        state.vel.x *= 0.98;
+        state.vel.y *= 0.98;
+
+        state.pos.x += state.vel.x;
+        state.pos.y += state.vel.y;
+
+        // Boundary Checks (Bounce)
+        if (state.pos.y < imsTop + 10) { state.pos.y = imsTop + 10; state.vel.y *= -1; }
+        if (state.pos.y > imsBottom - 10) { state.pos.y = imsBottom - 10; state.vel.y *= -1; }
+
+        // Side walls
+        if (state.pos.x < 10) { state.pos.x = 10; state.vel.x *= -1; }
+        if (state.pos.x > canvas.width - 10) { state.pos.x = canvas.width - 10; state.vel.x *= -1; }
+
+        // Duration
+        if (state.timer > 180) {
             evaluateResult();
         }
     }
 
-    // D. Outer Membrane (SAM)
+    // D. Outer Membrane (SAM) - Single Pass Insertion
     else if (state.phase === 'moving_sam') {
         const tX = canvas.width * COMPLEXES.sam.x;
         moveTo(tX, tomY + 40, speed, () => {
             state.phase = 'entering_sam';
+            state.timer = 0;
         });
     }
     else if (state.phase === 'entering_sam') {
-        state.pos.y -= 1; // Insert Upwards
-        if (state.pos.y <= tomY + 15) evaluateResult();
-    }
+        state.timer++;
+        const targetY = tomY + 15; // Center of OM
 
-    // E. Complete (Hover while message shows)
-    else if (state.phase === 'complete') {
-        // Gentle float
-        state.pos.y += (Math.random() - 0.5) * 0.5;
-        state.pos.x += (Math.random() - 0.5) * 0.5;
+        // Move upwards into membrane
+        const dy = targetY - state.pos.y;
+        state.pos.y += dy * 0.05; // Ease in
+
+        // Slight wobble while inserting
+        state.pos.x += Math.sin(state.timer * 0.5) * 0.5;
+
+        if (Math.abs(dy) < 0.5 && state.timer > 60) {
+            evaluateResult();
+        }
     }
 
     // Trail
@@ -364,6 +415,21 @@ function drawComplex(c) {
     const cy = (ZONES[c.yZone].y * canvas.height) + (ZONES[c.yZone].h * canvas.height) / 2;
     const w = 40, h = 30;
 
+    // PAM Complex (Only for TIM23)
+    if (c.label === 'TIM23') {
+        ctx.beginPath();
+        ctx.arc(cx + 15, cy + h / 2 + 5, 10, 0, Math.PI * 2);
+        ctx.fillStyle = '#f1c40f'; // Yellow
+        ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#000";
+        ctx.font = "10px Arial";
+        ctx.fillText("PAM", cx + 25, cy + h / 2 + 20);
+    }
+
     ctx.fillStyle = c.color;
     ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
     ctx.strokeStyle = "#000";
@@ -381,6 +447,46 @@ function drawComplex(c) {
 }
 
 function drawPolypeptide(p) {
+    // Special "Stuck" Animations for Complete Phase
+    if (state.phase === 'complete') {
+        if (state.targetPath === 'tom_tim22') {
+            // Draw Multipass Weaving (Static)
+            const cx = state.pos.x;
+            const cy = (ZONES.im.y * canvas.height);
+            ctx.beginPath();
+            ctx.moveTo(cx - 20, cy);
+            for (let i = -20; i <= 20; i++) {
+                ctx.lineTo(cx + i, cy + Math.sin(i * 0.5) * 15);
+            }
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = p.color;
+            ctx.stroke();
+            return;
+        } else if (state.targetPath === 'tom_sam') {
+            // Draw Beta-Barrel (Zigzag/Rectangle)
+            const cx = state.pos.x;
+            const cy = (ZONES.om.y * canvas.height) + 15;
+            ctx.beginPath();
+            // Draw a simple barrel shape
+            ctx.rect(cx - 10, cy - 15, 20, 30);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = p.color;
+            ctx.stroke();
+
+            // Internal zigzag
+            ctx.beginPath();
+            ctx.moveTo(cx - 8, cy - 12);
+            ctx.lineTo(cx + 8, cy - 5);
+            ctx.lineTo(cx - 8, cy + 5);
+            ctx.lineTo(cx + 8, cy + 12);
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            return;
+        }
+    }
+
     ctx.beginPath();
     if (state.pathPoints.length > 0) {
         let pts = state.pathPoints;
