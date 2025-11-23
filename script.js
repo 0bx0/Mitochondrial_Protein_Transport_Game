@@ -89,7 +89,8 @@ let state = {
     targetPath: null,
     pathPoints: [],
     smallTims: [], // Visual particles
-    timer: 0 // New timer for event sequencing
+    timer: 0, // New timer for event sequencing
+    success: false // Track if pathway was correct
 };
 
 function init() {
@@ -215,17 +216,19 @@ function update() {
         // Fade out chaperones
         if (state.smallTims.length > 0 && Math.random() > 0.8) state.smallTims.pop();
 
-        // Multipass Weaving Animation
-        // Weave up and down across the membrane line
+        // Multipass Weaving Animation with Offset
         const membraneY = tim23Y;
         const weaveSpeed = 0.1;
         const weaveAmp = 15;
 
-        // Horizontal drift
-        state.pos.x += (Math.random() - 0.5);
+        // Target X is offset to the left of the complex
+        const targetX = (canvas.width * COMPLEXES.tim22.x) - 70;
+
+        // Move X towards target
+        const dx = targetX - state.pos.x;
+        state.pos.x += dx * 0.03;
 
         // Vertical Weave
-        // Use sin wave to simulate passing in and out
         state.pos.y = membraneY + Math.sin(state.timer * weaveSpeed) * weaveAmp;
 
         // Damping amplitude over time to "stuck" it
@@ -234,7 +237,7 @@ function update() {
             const targetY = membraneY;
             state.pos.y += (targetY - state.pos.y) * 0.05;
 
-            if (Math.abs(state.pos.y - targetY) < 1 && state.timer > 150) {
+            if (Math.abs(state.pos.y - targetY) < 1 && Math.abs(dx) < 1 && state.timer > 150) {
                 evaluateResult();
             }
         }
@@ -275,26 +278,48 @@ function update() {
         }
     }
 
-    // D. Outer Membrane (SAM) - Single Pass Insertion
+    // D. Outer Membrane (SAM) - Parabolic Path & Interaction
     else if (state.phase === 'moving_sam') {
-        const tX = canvas.width * COMPLEXES.sam.x;
-        moveTo(tX, tomY + 40, speed, () => {
+        state.timer++;
+
+        // Spawn Small TIMs if not present to simulate "cloud"
+        if (state.smallTims.length === 0 && state.timer === 1) {
+            spawnSmallTIMs(canvas.width * 0.7, imsY);
+        }
+
+        const startX = canvas.width * COMPLEXES.tom.x;
+        const endX = canvas.width * COMPLEXES.sam.x;
+        const duration = 120; // frames
+
+        if (state.timer <= duration) {
+            const t = state.timer / duration;
+
+            // Linear X
+            state.pos.x = startX + (endX - startX) * t;
+
+            // Parabolic Y (dip into IMS)
+            // 4 * (y - h) * x * (1 - x)  parabola shape
+            const dip = 100;
+            state.pos.y = (tomY + 30) + (Math.sin(t * Math.PI) * dip);
+
+        } else {
             state.phase = 'entering_sam';
             state.timer = 0;
-        });
+        }
     }
     else if (state.phase === 'entering_sam') {
         state.timer++;
         const targetY = tomY + 15; // Center of OM
+        const targetX = (canvas.width * COMPLEXES.sam.x) + 40; // Offset to Right
 
-        // Move upwards into membrane
-        const dy = targetY - state.pos.y;
-        state.pos.y += dy * 0.05; // Ease in
+        // Move towards target
+        state.pos.x += (targetX - state.pos.x) * 0.05;
+        state.pos.y += (targetY - state.pos.y) * 0.05;
 
-        // Slight wobble while inserting
-        state.pos.x += Math.sin(state.timer * 0.5) * 0.5;
+        // Slight wobble
+        state.pos.y += Math.sin(state.timer * 0.5) * 0.5;
 
-        if (Math.abs(dy) < 0.5 && state.timer > 60) {
+        if (Math.abs(state.pos.y - targetY) < 0.5 && Math.abs(state.pos.x - targetX) < 1 && state.timer > 60) {
             evaluateResult();
         }
     }
@@ -448,7 +473,7 @@ function drawComplex(c) {
 
 function drawPolypeptide(p) {
     // Special "Stuck" Animations for Complete Phase
-    if (state.phase === 'complete') {
+    if (state.phase === 'complete' && state.success) {
         if (state.targetPath === 'tom_tim22') {
             // Draw Multipass Weaving (Static)
             const cx = state.pos.x;
@@ -510,9 +535,9 @@ function drawPolypeptide(p) {
 
 function evaluateResult() {
     state.phase = 'complete';
-    const correct = state.targetPath === state.protein.id;
+    state.success = state.targetPath === state.protein.id;
 
-    if (correct) {
+    if (state.success) {
         state.score++;
         showOverlay(true, "Correct Pathway!", "Protein reached correct destination.");
     } else {
