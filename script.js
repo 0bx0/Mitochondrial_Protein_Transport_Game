@@ -91,7 +91,8 @@ let state = {
     pathPoints: [],
     smallTims: [], // Visual particles
     timer: 0, // New timer for event sequencing
-    success: false // Track if pathway was correct
+    success: false, // Track if pathway was correct
+    foldedShape: [] // Store random points for folded protein
 };
 
 function init() {
@@ -510,28 +511,66 @@ function drawPolypeptide(p) {
             ctx.lineWidth = 2;
             ctx.stroke();
             return;
-        }
-    }
+        } else if (state.targetPath === 'tom_tim23' || state.targetPath === 'tom_small_tims') {
+            // Draw Squiggly Folded Protein
+            const cx = state.pos.x;
+            const cy = state.pos.y;
 
-    ctx.beginPath();
-    if (state.pathPoints.length > 0) {
-        let pts = state.pathPoints;
-        ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-        for (let i = pts.length - 2; i >= 0; i--) {
-            ctx.lineTo(pts[i].x, pts[i].y);
-        }
-    }
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = p.color;
-    ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
 
-    const head = state.pos;
-    ctx.beginPath();
-    ctx.arc(head.x, head.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = p.signalColor;
-    ctx.fill();
+            // Use pre-generated shape or generate one
+            if (state.foldedShape.length === 0) {
+                for (let i = 0; i < 10; i++) {
+                    state.foldedShape.push({
+                        x: (Math.random() - 0.5) * 30,
+                        y: (Math.random() - 0.5) * 30
+                    });
+                }
+            }
+
+            state.foldedShape.forEach(pt => {
+                ctx.lineTo(cx + pt.x, cy + pt.y);
+            });
+
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+        }
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = p.color;
+        ctx.stroke();
+
+        const head = state.pos;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = p.signalColor;
+        ctx.fill();
+    } else {
+        // Moving State (Trail + Head)
+        if (state.pathPoints.length > 0) {
+            ctx.beginPath();
+            ctx.moveTo(state.pathPoints[0].x, state.pathPoints[0].y);
+            for (let i = 1; i < state.pathPoints.length; i++) {
+                ctx.lineTo(state.pathPoints[i].x, state.pathPoints[i].y);
+            }
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = p.color;
+            ctx.stroke();
+        }
+
+        const head = state.pos;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = p.signalColor;
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
 }
 
 function evaluateResult() {
@@ -540,6 +579,11 @@ function evaluateResult() {
 
     if (state.success) {
         state.score++;
+        // Clear chaperones
+        state.smallTims = [];
+        // Reset folded shape
+        state.foldedShape = [];
+
         showOverlay(true, "Correct Pathway!", "Protein reached correct destination.");
     } else {
         showOverlay(false, "Incorrect Pathway", "Signals did not match the transport machinery.");
